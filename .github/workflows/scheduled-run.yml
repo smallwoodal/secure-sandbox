@@ -1,0 +1,41 @@
+name: Scheduled Pipeline Run
+
+on:
+  schedule:
+    # Weekday mornings at 8am UTC — adjust as needed
+    - cron: "0 8 * * 1-5"
+  workflow_dispatch: # Allow manual trigger
+
+# Scoped permissions — only what's needed to run pipelines
+permissions:
+  contents: read
+
+jobs:
+  run-pipelines:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run pipelines
+        run: python pipelines/run_all.py
+        # env:
+        #   If secrets are needed for output delivery (e.g., SharePoint upload),
+        #   add them as scoped repository secrets and uncomment:
+        #   SHAREPOINT_TOKEN: ${{ secrets.SHAREPOINT_TOKEN }}
+
+      - name: Upload outputs as artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: pipeline-outputs
+          path: output/
+          retention-days: 30

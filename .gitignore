@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+
+# Untrusted inbound data — never commit raw inputs
+data/inbox/*
+!data/inbox/.gitkeep
+
+# Outputs (large outputs go to external storage, not git)
+output/*
+!output/.gitkeep
+
+# Environment / secrets — must never be committed
+.env
+.env.*
+*.pem
+*.key
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
