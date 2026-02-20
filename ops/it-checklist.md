@@ -35,12 +35,37 @@ CLAUDE.md is advisory. The sandbox provides actual OS-level enforcement. Deploy 
 ```json
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
-  "defaultMode": "dontAsk",
   "allowManagedPermissionRulesOnly": true,
   "allowManagedHooksOnly": true,
   "allowedMcpServers": [],
+  "strictKnownMarketplaces": true,
   "permissions": {
+    "defaultMode": "dontAsk",
     "disableBypassPermissionsMode": "disable",
+    "allow": [
+      "Read",
+      "Edit",
+      "Write",
+      "Glob",
+      "Grep",
+      "Bash(pytest *)",
+      "Bash(python *)",
+      "Bash(python3 *)",
+      "Bash(ls *)",
+      "Bash(mkdir *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git branch *)",
+      "Bash(git checkout *)",
+      "Bash(git switch *)",
+      "Bash(git status)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git stash *)",
+      "Bash(git push origin *)",
+      "Bash(gh pr create *)",
+      "Bash(gh pr view *)"
+    ],
     "deny": [
       "WebFetch",
       "WebSearch",
@@ -95,14 +120,16 @@ CLAUDE.md is advisory. The sandbox provides actual OS-level enforcement. Deploy 
 
 **What each section does:**
 - `$schema` — enables validation against the official Claude Code settings schema
-- `defaultMode: "dontAsk"` — auto-denies any tool not explicitly allowed in project settings. Eliminates permission prompts that could be social-engineered via prompt injection.
-- `allowManagedPermissionRulesOnly` — prevents local/project settings from overriding denies
+- `allowManagedPermissionRulesOnly` — only permission rules in this file apply. Project/user-level rules are ignored. IT controls the full permission model.
 - `allowManagedHooksOnly` — blocks user/project hooks that could bypass controls
 - `allowedMcpServers: []` — blocks all MCP server connections (empty allowlist = nothing permitted)
+- `strictKnownMarketplaces: true` — restricts marketplace/plugin installations to verified sources only
+- `permissions.defaultMode: "dontAsk"` — auto-denies any tool not in the managed allow list. No permission prompts to social-engineer.
 - `permissions.disableBypassPermissionsMode` — prevents unrestricted mode
+- `permissions.allow` — the explicit allowlist of tools Claude can use. **IT controls this list.** Adjust for your team's needs. `Bash(python *)` is broad — for tighter control, replace with specific commands like `Bash(python src/*)`.
 - `WebFetch`/`WebSearch` deny — blocks Claude's built-in web browsing. **Remove these two lines if analysts need web access** — see Known Limitations for tradeoffs.
 - `Read()`/`Edit()` deny rules — block Claude's file tools from sensitive paths
-- `Bash()` deny rules — block destructive and unauthorized shell commands
+- `Bash()` deny rules — block destructive and unauthorized shell commands. Deny always overrides allow.
 - `sandbox.enabled` + `allowUnsandboxedCommands: false` — OS-level Bash isolation with no escape hatch
 - `sandbox.network.allowedDomains` — restricts what Bash commands can reach (curl, python scripts, etc.)
 

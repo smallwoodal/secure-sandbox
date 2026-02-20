@@ -31,14 +31,14 @@ No single layer is sufficient alone.
 |---|---|---|
 | **CLAUDE.md** | Behavioral rules: PR-only workflow, don't access secrets, treat external content as untrusted | **Advisory** — Claude follows these but nothing technically prevents violation |
 | **GitHub controls** | Branch protection, CODEOWNERS, required reviews, CI checks | **Enforced by GitHub** — no code reaches `main` without review |
-| **Claude Code managed settings** | Bash sandbox (OS-level write isolation + network restrictions), permission deny rules for file tools and commands, web browsing deny, MCP server lockout, hook locks, `dontAsk` default mode. Enterprise flags prevent local override. | **Enforced by Claude Code + OS** — IT deploys managed settings the user can't override. |
+| **Claude Code managed settings** | Bash sandbox (OS-level write isolation + network restrictions), managed allow/deny rules for all tools, web browsing deny, MCP server lockout, hook locks, marketplace restrictions, `dontAsk` default mode. IT controls the full permission model. | **Enforced by Claude Code + OS** — IT deploys managed settings the user can't override. |
 
 **CLAUDE.md alone is not enough.** All three layers must be active. See [`it-checklist.md`](it-checklist.md) for setup.
 
 ### Known limitations (be honest with IT about these)
 
 - **Read/Edit deny rules only block those specific tools.** A Bash command like `cat ~/.ssh/id_rsa` is not blocked by `Read(~/.ssh/**)`. The Bash sandbox network restrictions mitigate this — even if Bash reads a file, it can't send it to an unlisted domain.
-- **Python code can call subprocess/os modules** which could bypass shell-level command denies. The sandbox network restrictions limit where that data can go. PR review is the backstop for code-level bypasses.
+- **`Bash(python *)` in the allow list is broad.** Python scripts can call subprocess/os modules, bypassing shell-level command denies. The sandbox network restrictions limit where data can go. For tighter control, replace with specific patterns like `Bash(python src/*)` or audited wrapper scripts. PR review is the backstop.
 - **Sandbox Bash reads are unrestricted by default.** Bash can read files outside the working directory. Writes are restricted to the working directory. The network allowlist prevents exfiltration.
 - **Web browsing is denied by default but can be enabled.** If you remove WebFetch/WebSearch from the deny list to give analysts web access, web browsing becomes an exfiltration vector — a prompt injection could use it to send locally-read data to an external URL. The Bash sandbox still blocks shell-level exfiltration. Accept this tradeoff explicitly if you enable it.
 - **Prompt injection defense is advisory.** CLAUDE.md tells Claude to parse deterministically, but there is no technical enforcement that prevents it from writing non-deterministic code. Code review is the control.
@@ -84,12 +84,37 @@ This is a hard control, not optional. It protects itself — can't be silently m
 ```json
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
-  "defaultMode": "dontAsk",
   "allowManagedPermissionRulesOnly": true,
   "allowManagedHooksOnly": true,
   "allowedMcpServers": [],
+  "strictKnownMarketplaces": true,
   "permissions": {
+    "defaultMode": "dontAsk",
     "disableBypassPermissionsMode": "disable",
+    "allow": [
+      "Read",
+      "Edit",
+      "Write",
+      "Glob",
+      "Grep",
+      "Bash(pytest *)",
+      "Bash(python *)",
+      "Bash(python3 *)",
+      "Bash(ls *)",
+      "Bash(mkdir *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git branch *)",
+      "Bash(git checkout *)",
+      "Bash(git switch *)",
+      "Bash(git status)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git stash *)",
+      "Bash(git push origin *)",
+      "Bash(gh pr create *)",
+      "Bash(gh pr view *)"
+    ],
     "deny": [
       "WebFetch",
       "WebSearch",
@@ -144,14 +169,16 @@ This is a hard control, not optional. It protects itself — can't be silently m
 
 **What each section does:**
 - `$schema` — enables validation against the official Claude Code settings schema
-- `defaultMode: "dontAsk"` — auto-denies any tool not explicitly allowed in project settings. Prevents social engineering where a prompt injection tricks a user into approving a dangerous action.
-- `allowManagedPermissionRulesOnly` — local/project settings cannot override these deny rules
+- `allowManagedPermissionRulesOnly` — only permission rules in this file apply. Project/user-level rules are ignored. IT controls the full permission model.
 - `allowManagedHooksOnly` — blocks user/project hooks that could bypass controls
 - `allowedMcpServers: []` — blocks all MCP server connections (empty allowlist = nothing permitted)
+- `strictKnownMarketplaces: true` — restricts marketplace/plugin installations to verified sources only
+- `permissions.defaultMode: "dontAsk"` — auto-denies any tool not in the managed allow list above. No permission prompts to social-engineer.
 - `permissions.disableBypassPermissionsMode` — prevents unrestricted mode
+- `permissions.allow` — the explicit allowlist of tools Claude can use. **IT controls this list.** Adjust for your team's needs. `Bash(python *)` is broad by design — for tighter control, replace with specific commands like `Bash(python src/*)`.
 - `WebFetch`/`WebSearch` deny — blocks Claude's built-in web browsing, closing the web-based exfiltration path. **Remove these two lines if analysts need Claude to browse the web** — this trades exfiltration protection for usability (see Known Limitations).
 - `Read()`/`Edit()` deny rules — block Claude's file tools from sensitive paths
-- `Bash()` deny rules — block destructive and unauthorized shell commands
+- `Bash()` deny rules — block destructive and unauthorized shell commands. Deny rules always override allow rules.
 - `sandbox.enabled` + `allowUnsandboxedCommands: false` — OS-level Bash isolation with no escape hatch
 - `sandbox.network.allowedDomains` — restricts what Bash commands can reach (curl, python scripts, etc.)
 
@@ -219,7 +246,7 @@ If output delivery to external systems is needed, IT adds scoped secrets to a **
 ## IT security FAQ
 
 **Q: Can Claude Code access the user's email, files, or credentials?**
-Managed settings provide multiple layers: `Read()`/`Edit()` deny rules block Claude's file tools from sensitive paths. The Bash sandbox restricts writes to the working directory and limits network access to allowlisted domains. Web browsing is denied. MCP servers are blocked (`allowedMcpServers: []`). Hooks and bypass mode are locked. `dontAsk` mode auto-denies any tool not explicitly allowed — no permission prompts to social-engineer. Without managed settings, protection is advisory only.
+Managed settings control the full permission model: only IT-approved tools are allowed, everything else is auto-denied (`dontAsk` mode) — no permission prompts for a user to approve. `Read()`/`Edit()` deny rules block sensitive paths. The Bash sandbox restricts writes to the working directory and limits network to allowlisted domains. Web browsing, MCP servers, unapproved hooks, and unapproved marketplace plugins are all blocked. Without managed settings, protection is advisory only.
 
 **Q: Can Claude push directly to main?**
 Branch protection prevents this. Claude can push to feature branches and open PRs — it cannot push to `main`.
@@ -240,4 +267,4 @@ None. GitHub repo + GitHub Actions (included in GitHub plans) + Claude Code on t
 
 ## The pitch to IT (one paragraph)
 
-This doesn't make the AI agent safe. It makes the environment safe for an imperfect agent. The workspace has nothing valuable to steal. Bash commands are sandboxed with network restrictions so data can't leave through unauthorized channels. Web browsing and MCP connections are blocked. Sensitive file paths are blocked. Hooks, plugins, and bypass mode are locked. Unapproved tools are auto-denied — no permission prompts to social-engineer. All code changes require human review before they go live. It's the same security model you use for junior developers — limited access, code review, and CI gates. The difference is this developer works 100x faster and never forgets to write tests.
+This doesn't make the AI agent safe. It makes the environment safe for an imperfect agent. IT controls the full permission model via managed settings — only approved tools work, everything else is auto-denied. The workspace has nothing valuable to steal. Bash commands are sandboxed with network restrictions so data can't leave through unauthorized channels. Web browsing and MCP connections are blocked. Sensitive file paths are blocked. Hooks, marketplace plugins, and bypass mode are locked. All code changes require human review before they go live. It's the same security model you use for junior developers — limited access, code review, and CI gates. The difference is this developer works 100x faster and never forgets to write tests.
