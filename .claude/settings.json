@@ -1,0 +1,49 @@
+{
+  "permissions": {
+    "allow": [
+      "Read",
+      "Glob",
+      "Grep",
+      "Bash(python *)",
+      "Bash(pytest *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git branch *)",
+      "Bash(git checkout *)",
+      "Bash(git status)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git stash *)"
+    ],
+    "deny": [
+      "Bash(rm -rf *)",
+      "Bash(curl * | bash)",
+      "Bash(wget * | bash)",
+      "Bash(pip install *)",
+      "Bash(git push *)",
+      "Bash(git remote *)",
+      "Bash(git config *)"
+    ]
+  },
+  "sandbox": {
+    "filesystem": {
+      "writablePaths": [],
+      "readablePaths": [],
+      "deniedPaths": [
+        "~/.ssh",
+        "~/.aws",
+        "~/.config",
+        "~/.env",
+        "~/.gnupg",
+        "~/.claude/memory"
+      ]
+    },
+    "network": {
+      "allowedDomains": [
+        "github.com",
+        "api.github.com"
+      ],
+      "allowUnixSockets": false
+    }
+  }
+}

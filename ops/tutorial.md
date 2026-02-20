@@ -32,14 +32,26 @@ Traditional "AI agent" setups give the agent broad access to a user's machine. T
 
 | Concern | How it's addressed |
 |---|---|
-| **Agent accesses sensitive data** | Claude only sees files inside one GitHub repo. No access to email, drives, credentials, or other repos. |
+| **Agent accesses sensitive data** | OS-level sandbox restricts file and network access. CLAUDE.md adds behavioral rules. Both layers together. |
 | **Agent makes unauthorized changes** | All changes go through Pull Requests. Nothing reaches production without human review. |
 | **Prompt injection (poisoned web pages)** | External content is parsed deterministically (selectors, regex, schemas) — never interpreted as instructions. Even if injection succeeds, there are no secrets to steal and no privileged actions available. |
 | **Secrets leak** | No secrets exist in the workspace. Scheduled runs use scoped GitHub Secrets that Claude never sees. |
-| **Uncontrolled internet access** | Each scraper declares its allowed domains. Network access is auditable and scoped. |
+| **Uncontrolled internet access** | Sandbox network allowlist restricts outbound domains at the OS level. Each scraper also declares allowed domains for auditability. |
 | **Shadow IT / untracked code** | Everything is in Git with full history. CODEOWNERS enforces review. CI runs are logged. |
 
 **The core principle: capability containment.** We don't try to prevent all attacks — we ensure that even a successful attack can't do meaningful damage.
+
+### The three security layers (important — read this)
+
+This system relies on three layers working together. No single layer is sufficient alone.
+
+| Layer | What it does | Enforcement |
+|---|---|---|
+| **1. CLAUDE.md** | Behavioral rules: "don't access secrets," "PR-only workflow," "parse deterministically" | **Advisory** — Claude follows these instructions but nothing technically prevents violation. Think of it as a policy document. |
+| **2. GitHub controls** | Branch protection, CODEOWNERS, required reviews, CI checks | **Technically enforced** by GitHub. No code reaches `main` without review. But IT must enable these settings. |
+| **3. Claude Code sandbox** | OS-level filesystem and network restrictions (Apple Seatbelt on macOS, bubblewrap on Linux). Blocks reads/writes outside allowed paths, blocks network to unlisted domains. | **Technically enforced** at the OS level. This is the real security backstop. IT should deploy managed settings so analysts can't override. |
+
+**CLAUDE.md alone is not enough.** If your IT team only clones the repo and skips the GitHub controls and sandbox setup, the security is aspirational, not real. Follow the full IT checklist at `ops/it-checklist.md`.
 
 ---
 
@@ -99,7 +111,38 @@ requirements.txt             @your-org/it-security
 
 This means even if an analyst approves a PR, changes to these files also require IT sign-off.
 
-### Step 4: Install Claude Code on the analyst's machine
+### Step 4: Deploy managed sandbox settings (IT does this BEFORE the analyst starts)
+
+This is the most important security step. Managed settings are deployed to the analyst's machine by IT and **cannot be overridden** by the analyst or by Claude Code.
+
+**macOS** — create `/Library/Application Support/ClaudeCode/managed-settings.json`:
+```json
+{
+  "permissions": {
+    "deny": [
+      "Bash(rm -rf *)",
+      "Bash(curl * | bash)",
+      "Bash(wget * | bash)",
+      "Bash(pip install *)"
+    ]
+  },
+  "sandbox": {
+    "filesystem": {
+      "deniedPaths": ["~/.ssh", "~/.aws", "~/.config", "~/.env", "~/.gnupg"]
+    },
+    "network": {
+      "allowedDomains": ["github.com", "api.github.com"],
+      "allowUnixSockets": false
+    }
+  }
+}
+```
+
+**Linux** — same file at `/etc/claude-code/managed-settings.json`.
+
+When analysts need a scraper to reach a new domain (e.g., `api.fiscaldata.treasury.gov`), they request it. IT adds the domain to managed settings and documents why.
+
+### Step 5: Install Claude Code on the analyst's machine
 
 ```bash
 # Install Claude Code
@@ -114,9 +157,9 @@ cd analyst-automations
 claude
 ```
 
-When Claude Code starts, it reads `CLAUDE.md` automatically. All the security constraints are loaded — the analyst doesn't need to configure anything.
+When Claude Code starts, it reads `CLAUDE.md` and `.claude/settings.json` automatically. The managed settings deployed in Step 4 take precedence over everything.
 
-### Step 5: Verify the constraints are active
+### Step 6: Verify the constraints are active
 
 The analyst can test this by asking Claude Code:
 
