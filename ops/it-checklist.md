@@ -66,20 +66,14 @@ Place this file on the analyst's machine. It takes highest precedence over all o
         "~/.gnupg",
         "~/.claude/memory"
       ]
-    },
-    "network": {
-      "allowedDomains": [
-        "github.com",
-        "api.github.com"
-      ],
-      "allowUnixSockets": false
     }
   }
 }
 ```
 
+**Why no network restrictions here?** Analysts already have unrestricted internet access on their machines (browser, terminal, etc.). Restricting Claude Code's web access during development adds friction without meaningful security benefit — the workspace has no secrets to exfiltrate, and nothing deploys without PR review. Network restrictions are enforced in CI/production instead (see GitHub Actions workflows).
+
 - [ ] Deploy managed settings file to analyst machine(s)
-- [ ] Add scraper-specific domains to `network.allowedDomains` as needed
 - [ ] Verify managed settings cannot be overridden by the analyst
 
 ### Option B: Project settings (included in repo — weaker, analyst could modify locally)
@@ -103,7 +97,6 @@ The repo ships with `.claude/settings.json` which provides project-level sandbox
 ## Verification
 - [ ] Analyst runs `claude` and confirms CLAUDE.md constraints are loaded
 - [ ] Test sandbox enforcement: ask Claude to `cat ~/.ssh/id_rsa` — should be blocked
-- [ ] Test network enforcement: ask Claude to fetch an unlisted domain — should be blocked
 - [ ] Analyst makes a test request and opens a PR
 - [ ] IT reviews the test PR and verifies CI checks pass
 - [ ] Merge and confirm scheduled workflow runs (or trigger manually via workflow_dispatch)

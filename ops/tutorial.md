@@ -36,7 +36,7 @@ Traditional "AI agent" setups give the agent broad access to a user's machine. T
 | **Agent makes unauthorized changes** | All changes go through Pull Requests. Nothing reaches production without human review. |
 | **Prompt injection (poisoned web pages)** | External content is parsed deterministically (selectors, regex, schemas) — never interpreted as instructions. Even if injection succeeds, there are no secrets to steal and no privileged actions available. |
 | **Secrets leak** | No secrets exist in the workspace. Scheduled runs use scoped GitHub Secrets that Claude never sees. |
-| **Uncontrolled internet access** | Sandbox network allowlist restricts outbound domains at the OS level. Each scraper also declares allowed domains for auditability. |
+| **Uncontrolled internet access** | Analysts already have internet access on their machines — Claude is no different. Security comes from having nothing to exfiltrate, not from blocking the network. In production (CI), network is restricted to declared domains. |
 | **Shadow IT / untracked code** | Everything is in Git with full history. CODEOWNERS enforces review. CI runs are logged. |
 
 **The core principle: capability containment.** We don't try to prevent all attacks — we ensure that even a successful attack can't do meaningful damage.
@@ -49,7 +49,7 @@ This system relies on three layers working together. No single layer is sufficie
 |---|---|---|
 | **1. CLAUDE.md** | Behavioral rules: "don't access secrets," "PR-only workflow," "parse deterministically" | **Advisory** — Claude follows these instructions but nothing technically prevents violation. Think of it as a policy document. |
 | **2. GitHub controls** | Branch protection, CODEOWNERS, required reviews, CI checks | **Technically enforced** by GitHub. No code reaches `main` without review. But IT must enable these settings. |
-| **3. Claude Code sandbox** | OS-level filesystem and network restrictions (Apple Seatbelt on macOS, bubblewrap on Linux). Blocks reads/writes outside allowed paths, blocks network to unlisted domains. | **Technically enforced** at the OS level. This is the real security backstop. IT should deploy managed settings so analysts can't override. |
+| **3. Claude Code sandbox** | OS-level filesystem restrictions (Apple Seatbelt on macOS, bubblewrap on Linux). Blocks reads/writes outside allowed paths. Dangerous commands (rm -rf, pipe-to-bash, git push) are denied. | **Technically enforced** at the OS level. This is the real security backstop. IT should deploy managed settings so analysts can't override. |
 
 **CLAUDE.md alone is not enough.** If your IT team only clones the repo and skips the GitHub controls and sandbox setup, the security is aspirational, not real. Follow the full IT checklist at `ops/it-checklist.md`.
 
@@ -123,16 +123,22 @@ This is the most important security step. Managed settings are deployed to the a
       "Bash(rm -rf *)",
       "Bash(curl * | bash)",
       "Bash(wget * | bash)",
-      "Bash(pip install *)"
+      "Bash(pip install *)",
+      "Bash(git push *)",
+      "Bash(git remote *)",
+      "Bash(git config *)"
     ]
   },
   "sandbox": {
     "filesystem": {
-      "deniedPaths": ["~/.ssh", "~/.aws", "~/.config", "~/.env", "~/.gnupg"]
-    },
-    "network": {
-      "allowedDomains": ["github.com", "api.github.com"],
-      "allowUnixSockets": false
+      "deniedPaths": [
+        "~/.ssh",
+        "~/.aws",
+        "~/.config",
+        "~/.env",
+        "~/.gnupg",
+        "~/.claude/memory"
+      ]
     }
   }
 }
@@ -140,7 +146,7 @@ This is the most important security step. Managed settings are deployed to the a
 
 **Linux** — same file at `/etc/claude-code/managed-settings.json`.
 
-When analysts need a scraper to reach a new domain (e.g., `api.fiscaldata.treasury.gov`), they request it. IT adds the domain to managed settings and documents why.
+**Why no network restrictions?** Analysts already have unrestricted internet on their machines. Restricting Claude Code's web access during development adds friction without security benefit — the workspace has no secrets, and nothing deploys without PR review. Network restrictions are enforced in CI/production only (GitHub Actions).
 
 ### Step 5: Install Claude Code on the analyst's machine
 
@@ -275,8 +281,11 @@ The `CLAUDE.md` rules require deterministic parsing (CSS selectors, regex, JSON 
 **Q: Can Claude Code install arbitrary packages?**
 `CLAUDE.md` prohibits modifying `requirements.txt` without explicit user approval and PR review. IT can enforce this further via CODEOWNERS.
 
+**Q: Claude Code can access the internet — isn't that a risk?**
+Analysts already have unrestricted internet access on their machines via their browser. Claude Code fetching a web page is no different. The security doesn't come from restricting web access — it comes from ensuring there's nothing valuable to exfiltrate (no secrets in the workspace), nothing destructive Claude can do (filesystem sandbox, dangerous commands denied), and nothing goes live without review (branch protection). Network restrictions are enforced in production (GitHub Actions), not during development.
+
 **Q: What about data exfiltration?**
-Each scraper declares its allowed domains. There are no secrets in the workspace to exfiltrate. Output goes to `output/` (git-ignored) or GitHub Actions artifacts. Network access is scoped and logged.
+There are no secrets in the workspace to exfiltrate. The filesystem sandbox blocks access to SSH keys, AWS credentials, and other sensitive local files. Even if a prompt injection told Claude to send data somewhere, there's nothing sensitive to send. In production (GitHub Actions), network access is restricted to declared domains only.
 
 **Q: Can Claude Code modify its own rules?**
 `CLAUDE.md` is listed as a protected file. Changes require explicit acknowledgment and show up clearly in PRs. CODEOWNERS can require IT approval for any changes to it.

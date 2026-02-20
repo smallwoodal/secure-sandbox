@@ -37,13 +37,6 @@
         "~/.gnupg",
         "~/.claude/memory"
       ]
-    },
-    "network": {
-      "allowedDomains": [
-        "github.com",
-        "api.github.com"
-      ],
-      "allowUnixSockets": false
     }
   }
 }
