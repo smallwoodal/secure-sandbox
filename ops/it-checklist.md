@@ -1,6 +1,6 @@
 # IT Setup Checklist
 
-Use this checklist when provisioning a new secure-sandbox repo for a team.
+Use this checklist when provisioning a new sandbox repo for a team.
 
 ## 1. Repository setup
 - [ ] Create private repo in GitHub organization (use this repo as template)

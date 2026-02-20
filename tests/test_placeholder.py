@@ -6,14 +6,6 @@ def test_repo_structure():
     from pathlib import Path
 
     root = Path(__file__).parent.parent
-    expected_dirs = [
-        "scrapers",
-        "pipelines",
-        "connectors",
-        "schemas",
-        "data/inbox",
-        "output",
-        "ops",
-    ]
+    expected_dirs = ["src", "data/inbox", "output", "ops", "tests"]
     for d in expected_dirs:
         assert (root / d).is_dir(), f"Missing directory: {d}"

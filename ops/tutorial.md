@@ -1,6 +1,6 @@
-# Setting Up Claude Code for Secure Automation
+# Setting Up Claude Code in a Secure Sandbox
 
-A guide for fund managers to present to their IT departments.
+A guide for teams to present to their IT departments.
 
 ---
 
@@ -18,9 +18,9 @@ A command-line tool from Anthropic. Users describe tasks in plain English — Cl
 |---|---|
 | Agent accesses sensitive data | OS-level sandbox blocks access to SSH keys, AWS credentials, and other sensitive files on the machine. |
 | Agent makes unauthorized changes | All changes go through Pull Requests. Nothing reaches production without human review. |
-| Prompt injection (poisoned web pages) | Even if injection succeeds, there are no secrets to steal, dangerous commands are denied, and nothing deploys without PR review. |
+| Prompt injection (poisoned content) | Even if injection succeeds, there are no secrets to steal, dangerous commands are denied, and nothing deploys without PR review. |
 | Secrets leak | No secrets exist in the workspace. Scheduled CI runs use scoped GitHub Secrets that Claude never sees. |
-| Internet access | Analysts already have internet on their machines — Claude is no different. Security comes from having nothing to exfiltrate, not blocking the network. |
+| Internet access | Users already have internet on their machines — Claude is no different. Security comes from having nothing to exfiltrate, not blocking the network. |
 | Untracked code | Everything is in Git. CODEOWNERS enforces review. CI runs are logged. Full audit trail. |
 
 ### The three security layers
@@ -29,9 +29,9 @@ No single layer is sufficient alone.
 
 | Layer | What it does | Enforcement |
 |---|---|---|
-| **CLAUDE.md** | Behavioral rules: PR-only workflow, deterministic parsing, don't access secrets | **Advisory** — Claude follows these but nothing technically prevents violation |
+| **CLAUDE.md** | Behavioral rules: PR-only workflow, don't access secrets, treat external content as untrusted | **Advisory** — Claude follows these but nothing technically prevents violation |
 | **GitHub controls** | Branch protection, CODEOWNERS, required reviews, CI checks | **Enforced by GitHub** — no code reaches `main` without review |
-| **Claude Code sandbox** | OS-level filesystem restrictions, dangerous commands denied | **Enforced at OS level** — IT deploys managed settings the analyst can't override |
+| **Claude Code sandbox** | OS-level filesystem restrictions, dangerous commands denied | **Enforced at OS level** — IT deploys managed settings the user can't override |
 
 **CLAUDE.md alone is not enough.** All three layers must be active. See [`it-checklist.md`](it-checklist.md) for setup.
 
@@ -67,7 +67,7 @@ This is a hard control, not optional. It protects itself — can't be silently m
 
 ### 4. Deploy managed sandbox settings
 
-**This is the most important step.** Place this file on the analyst's machine via MDM (Jamf, Intune, etc.). It cannot be overridden.
+**This is the most important step.** Place this file on the user's machine via MDM (Jamf, Intune, etc.). It cannot be overridden.
 
 **macOS:** `/Library/Application Support/ClaudeCode/managed-settings.json`
 **Linux:** `/etc/claude-code/managed-settings.json`
@@ -103,7 +103,7 @@ This is a hard control, not optional. It protects itself — can't be silently m
 }
 ```
 
-**Why no network restrictions?** Analysts already have unrestricted internet on their machines. Restricting Claude's web access adds friction without security benefit — the workspace has no secrets and nothing deploys without review.
+**Why no network restrictions?** Users already have internet on their machines. Restricting Claude's web access adds friction without security benefit — the workspace has no secrets and nothing deploys without review.
 
 ### 5. Install Claude Code
 
@@ -127,27 +127,9 @@ Should be blocked at the OS level. If it's not, managed settings aren't active �
 
 ---
 
-## How analysts use it
+## Day-to-day usage
 
-Open a terminal in the repo, run `claude`, and describe what you need:
-
-**Build a scraper:**
-```
-Create a scraper under scrapers/treasury_rates/ that pulls daily yield
-curve rates from treasury.gov. Add schema validation and tests. Open a PR.
-```
-
-**Process Excel:**
-```
-Read data/inbox/holdings.xlsx, validate columns Ticker/Shares/Price,
-compute market value per row, output to output/holdings_summary.csv.
-Add tests with a synthetic fixture. Open a PR.
-```
-
-**Fix a broken scraper:**
-```
-Tests are failing for the treasury_rates scraper. Diagnose and fix. Open a PR.
-```
+Open a terminal in the repo, run `claude`, and describe what you need in plain English. Claude writes the code, adds tests, and opens a PR.
 
 Every request produces a Pull Request with a diff, test results, and risk notes. Review it, merge it, done.
 
@@ -157,9 +139,9 @@ Every request produces a Pull Request with a diff, test results, and risk notes.
 
 | Check | What to look for |
 |---|---|
-| Files changed | Scoped to `scrapers/`, `pipelines/`, `connectors/`, `schemas/`, `tests/`? Changes to protected files trigger CODEOWNERS review automatically. |
-| Domains | Does `config.yaml` list only expected public domains? |
-| Dependencies | New packages in `requirements.txt`? Well-known and necessary? |
+| Files changed | Changes to protected files (CLAUDE.md, workflows, deps) trigger CODEOWNERS review automatically. |
+| External integrations | Any new domains, APIs, or data sources? Expected and necessary? |
+| Dependencies | New packages? Well-known and necessary? |
 | Tests | Do they exist? Do they pass? (CI checks automatically.) |
 | Secrets | Any hardcoded keys or tokens? (There shouldn't be.) |
 
@@ -167,15 +149,15 @@ Every request produces a Pull Request with a diff, test results, and risk notes.
 
 ## Scheduled runs
 
-Once merged to `main`, scrapers can run on a schedule via GitHub Actions. The `scheduled-run.yml` workflow runs weekday mornings and uploads outputs as downloadable artifacts.
+Once merged to `main`, automation can run on a schedule via GitHub Actions. The `scheduled-run.yml` workflow runs on a configurable schedule and uploads outputs as downloadable artifacts.
 
-If output delivery to SharePoint/OneDrive is needed, IT adds scoped secrets to the repo (Settings → Secrets → Actions). Claude Code never sees these — they only exist in CI.
+If output delivery to external systems is needed, IT adds scoped secrets to the repo (Settings → Secrets → Actions). Claude Code never sees these — they only exist in CI.
 
 ---
 
 ## IT security FAQ
 
-**Q: Can Claude Code access the analyst's email, files, or credentials?**
+**Q: Can Claude Code access the user's email, files, or credentials?**
 Claude Code can technically access files on the machine. That's why managed settings are critical — they block sensitive paths (~/.ssh, ~/.aws, ~/.env) at the OS level. Without the sandbox, protection is advisory only. With it, access is physically blocked.
 
 **Q: Can Claude push directly to main?**
@@ -185,13 +167,13 @@ Branch protection prevents this. Claude can push to feature branches and open PR
 We assume it will happen. The defense is: even if injection succeeds, there are no secrets to steal, dangerous commands are denied, sensitive files are blocked by the sandbox, and nothing deploys without human review of the PR.
 
 **Q: Claude has internet access — isn't that risky?**
-The analyst already has internet access on the same machine. Claude fetching a webpage is no different from the analyst opening it in a browser. Security comes from having nothing to exfiltrate, not from blocking the network.
+The user already has internet access on the same machine. Claude fetching a webpage is no different from opening it in a browser. Security comes from having nothing to exfiltrate, not from blocking the network.
 
 **Q: What's the audit trail?**
 Git history (every change + who approved it), PR review records, GitHub Actions logs (every scheduled run), branch protection audit log.
 
 **Q: What infrastructure is required?**
-None. GitHub repo + GitHub Actions (included in GitHub plans) + Claude Code on the analyst's machine. No servers, databases, or VPNs.
+None. GitHub repo + GitHub Actions (included in GitHub plans) + Claude Code on the user's machine. No servers, databases, or VPNs.
 
 ---
 
