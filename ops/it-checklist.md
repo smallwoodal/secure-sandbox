@@ -34,10 +34,11 @@ CLAUDE.md is advisory. The sandbox provides actual OS-level enforcement. Deploy 
 
 ```json
 {
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "allowManagedPermissionRulesOnly": true,
   "allowManagedHooksOnly": true,
-  "disableBypassPermissionsMode": "disable",
   "permissions": {
+    "disableBypassPermissionsMode": "disable",
     "deny": [
       "Read(~/.ssh)",
       "Read(~/.ssh/**)",
@@ -75,6 +76,7 @@ CLAUDE.md is advisory. The sandbox provides actual OS-level enforcement. Deploy 
   },
   "sandbox": {
     "enabled": true,
+    "allowUnsandboxedCommands": false,
     "network": {
       "allowedDomains": [
         "github.com",
@@ -83,32 +85,32 @@ CLAUDE.md is advisory. The sandbox provides actual OS-level enforcement. Deploy 
         "files.pythonhosted.org"
       ]
     }
-  },
-  "deniedMcpServers": [{ "serverName": "*" }]
+  }
 }
 ```
 
-**What each layer does:**
+**What each section does:**
+- `$schema` — enables validation against the official Claude Code settings schema
 - `allowManagedPermissionRulesOnly` — prevents local/project settings from overriding denies
-- `allowManagedHooksOnly` — blocks user/project hooks
-- `disableBypassPermissionsMode` — prevents unrestricted mode
+- `allowManagedHooksOnly` — blocks user/project hooks that could bypass controls
+- `permissions.disableBypassPermissionsMode` — prevents unrestricted mode
 - `Read()`/`Edit()` deny rules — block Claude's file tools from sensitive paths
 - `Bash()` deny rules — block destructive and unauthorized shell commands
-- `sandbox.enabled` — OS-level Bash isolation (restricts writes to working directory)
-- `sandbox.network.allowedDomains` — restricts outbound network from Bash commands. **Claude's built-in web browsing is not affected** — only shell commands (curl, python scripts, etc.)
-- `deniedMcpServers` — blocks all MCP server connections
+- `sandbox.enabled` + `allowUnsandboxedCommands: false` — OS-level Bash isolation with no escape hatch
+- `sandbox.network.allowedDomains` — restricts what Bash commands can reach. **Only affects shell commands — Claude's built-in web browsing is not restricted.** Add domains as analysts build integrations.
 
 **Note:** Claude can push to feature branches (needed for PRs) but cannot push to `main`. Add domains to `allowedDomains` as analysts need new integrations.
 
 - [ ] Deploy managed settings file to analyst machine(s)
 - [ ] Verify managed settings cannot be overridden
-- [ ] Add scraper-specific domains to `allowedDomains` as needed
+- [ ] Add project-specific domains to `allowedDomains` as needed
 
 ### Known limitations (be transparent with security reviewers)
 - `Read()`/`Edit()` deny rules only block those specific tools — a Bash command like `cat ~/.ssh/id_rsa` is a separate surface. The sandbox network restrictions mitigate this: even if Bash reads a sensitive file, it can't send it to an unlisted domain.
 - Command deny patterns match specific strings. Creative variations may bypass them. PR review is the backstop for code-level bypasses.
 - The deny list is partial, not comprehensive. It blocks common dangerous patterns but cannot anticipate every variant.
 - Sandbox reads are unrestricted by default — Bash can read files outside the working directory. Writes are restricted. The network allowlist prevents exfiltration of read data.
+- Claude's built-in web browsing (WebFetch/WebSearch) is NOT restricted by the sandbox network allowlist — only Bash commands are. This means a prompt injection could theoretically use web browsing to exfiltrate locally-read data. The `Read()`/`Edit()` deny rules limit what Claude's file tools can access, and the Bash sandbox prevents shell-level exfiltration.
 
 ## 6. Analyst machine setup
 - [ ] Install Claude Code: `npm install -g @anthropic-ai/claude-code`
@@ -131,7 +133,7 @@ CLAUDE.md is advisory. The sandbox provides actual OS-level enforcement. Deploy 
   - Require at least 1 reviewer before deployment
   - Limit which branches can deploy (only `main`)
 - [ ] Add scoped secrets to the **environment**, not to the repo
-- [ ] Uncomment `environment: production` in `scheduled-run.yml`
+- [ ] Verify `environment: production` is set in `scheduled-run.yml` (already configured in template)
 - [ ] Document what each secret is for and its scope
 - [ ] Set expiration reminders
 - [ ] Enable GitHub secret scanning (Settings → Code security → Secret scanning)

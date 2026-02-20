@@ -40,6 +40,7 @@ No single layer is sufficient alone.
 - **Read/Edit deny rules only block those specific tools.** A Bash command like `cat ~/.ssh/id_rsa` is not blocked by `Read(~/.ssh/**)`. The Bash sandbox network restrictions mitigate this — even if Bash reads a file, it can't send it to an unlisted domain.
 - **Python code can call subprocess/os modules** which could bypass shell-level command denies. The sandbox network restrictions limit where that data can go. PR review is the backstop for code-level bypasses.
 - **Sandbox Bash reads are unrestricted by default.** Bash can read files outside the working directory. Writes are restricted to the working directory. The network allowlist prevents exfiltration.
+- **Claude's built-in web browsing is unrestricted.** The sandbox network allowlist only affects Bash commands. Claude's WebFetch/WebSearch tools work like a normal browser. This is by design (analysts need web access), but means a prompt injection could potentially use web browsing to exfiltrate data read from local files. The Bash sandbox prevents the most dangerous vector (shell-level exfil). PR review is the backstop.
 - **Prompt injection defense is advisory.** CLAUDE.md tells Claude to parse deterministically, but there is no technical enforcement that prevents it from writing non-deterministic code. Code review is the control.
 - **Merged code can access CI secrets.** If scheduled workflows use secrets, a malicious PR that passes review could exfiltrate them. Mitigate with protected GitHub Environments requiring deployment reviewers.
 
@@ -82,10 +83,11 @@ This is a hard control, not optional. It protects itself — can't be silently m
 
 ```json
 {
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "allowManagedPermissionRulesOnly": true,
   "allowManagedHooksOnly": true,
-  "disableBypassPermissionsMode": "disable",
   "permissions": {
+    "disableBypassPermissionsMode": "disable",
     "deny": [
       "Read(~/.ssh)",
       "Read(~/.ssh/**)",
@@ -123,6 +125,7 @@ This is a hard control, not optional. It protects itself — can't be silently m
   },
   "sandbox": {
     "enabled": true,
+    "allowUnsandboxedCommands": false,
     "network": {
       "allowedDomains": [
         "github.com",
@@ -131,20 +134,19 @@ This is a hard control, not optional. It protects itself — can't be silently m
         "files.pythonhosted.org"
       ]
     }
-  },
-  "deniedMcpServers": [{ "serverName": "*" }]
+  }
 }
 ```
 
 **What each section does:**
+- `$schema` — enables validation against the official Claude Code settings schema
 - `allowManagedPermissionRulesOnly` — local/project settings cannot override these deny rules
 - `allowManagedHooksOnly` — blocks user/project hooks that could bypass controls
-- `disableBypassPermissionsMode` — prevents unrestricted mode
+- `permissions.disableBypassPermissionsMode` — prevents unrestricted mode
 - `Read()`/`Edit()` deny rules — block Claude's file tools from sensitive paths
 - `Bash()` deny rules — block destructive and unauthorized shell commands
-- `sandbox.enabled` — OS-level isolation for Bash commands (restricts writes to working directory)
-- `sandbox.network.allowedDomains` — restricts what Bash commands can reach over the network. **This only affects shell commands (curl, python scripts, etc.) — Claude's built-in web browsing still works unrestricted.** Add domains here as analysts build new integrations.
-- `deniedMcpServers` — blocks all MCP server connections unless explicitly approved
+- `sandbox.enabled` + `allowUnsandboxedCommands: false` — OS-level Bash isolation with no escape hatch
+- `sandbox.network.allowedDomains` — restricts what Bash commands can reach. **Only affects shell commands — Claude's built-in web browsing is not restricted.** Add domains as analysts build integrations.
 
 ### 5. Install Claude Code
 
@@ -198,7 +200,7 @@ Every request produces a Pull Request with a diff, test results, and risk notes.
 
 Once merged to `main`, automation can run on a schedule via GitHub Actions. The `scheduled-run.yml` workflow runs on a configurable schedule and uploads outputs as downloadable artifacts.
 
-If output delivery to external systems is needed, IT adds scoped secrets to the repo (Settings → Secrets → Actions). Claude Code never sees these — they only exist in CI.
+If output delivery to external systems is needed, IT adds scoped secrets to a **protected GitHub Environment** (not repo-level secrets). Protected environments require a deployment reviewer before any workflow can access the secrets — this prevents a malicious merged PR from silently exfiltrating them. See [`it-checklist.md`](it-checklist.md) for setup.
 
 ---
 
@@ -214,7 +216,7 @@ Branch protection prevents this. Claude can push to feature branches and open PR
 We assume it will happen. The defense is: even if injection succeeds, there are no secrets to steal, dangerous commands are denied, sensitive files are blocked by the sandbox, and nothing deploys without human review of the PR.
 
 **Q: Claude has internet access — isn't that risky?**
-Claude's built-in web browsing works unrestricted (same as the user opening a browser). But Bash commands (curl, python scripts, etc.) are sandboxed — they can only reach domains on the managed allowlist. This means a prompt injection can't use a shell command to exfiltrate data to an attacker's server. New domains are added by IT as analysts build integrations.
+Claude's built-in web browsing works unrestricted (same as the user opening a browser). Bash commands (curl, python scripts, etc.) are sandboxed — they can only reach domains on the managed allowlist. This blocks the most common exfiltration vector (shell commands sending data to attacker servers). Web browsing is a weaker exfiltration path — it's harder to abuse programmatically and the analyst can see what Claude is doing. New domains are added by IT as analysts build integrations.
 
 **Q: What's the audit trail?**
 Git history (every change + who approved it), PR review records, GitHub Actions logs (every scheduled run), branch protection audit log.
