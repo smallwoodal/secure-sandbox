@@ -19,9 +19,25 @@
       "Bash(gh pr view *)"
     ],
     "deny": [
+      "Read(~/.ssh)",
+      "Read(~/.ssh/**)",
+      "Read(~/.aws)",
+      "Read(~/.aws/**)",
+      "Read(~/.gnupg)",
+      "Read(~/.gnupg/**)",
+      "Read(~/.env)",
+      "Read(~/.env.*)",
+      "Read(~/.config/gcloud/**)",
+      "Edit(~/.ssh/**)",
+      "Edit(~/.aws/**)",
+      "Edit(~/.gnupg/**)",
+      "Edit(~/.bashrc)",
+      "Edit(~/.zshrc)",
+      "Edit(~/.profile)",
       "Bash(rm -rf *)",
       "Bash(curl * | *)",
-      "Bash(wget * | *)",
+      "Bash(curl * -o *)",
+      "Bash(wget *)",
       "Bash(pip install *)",
       "Bash(pip3 install *)",
       "Bash(python -m pip *)",
@@ -36,17 +52,5 @@
       "Bash(git remote set-url *)",
       "Bash(git config *)"
     ]
-  },
-  "sandbox": {
-    "filesystem": {
-      "deniedPaths": [
-        "~/.ssh",
-        "~/.aws",
-        "~/.config",
-        "~/.env",
-        "~/.gnupg",
-        "~/.claude/memory"
-      ]
-    }
   }
 }

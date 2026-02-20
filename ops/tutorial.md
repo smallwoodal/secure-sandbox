@@ -16,7 +16,7 @@ A command-line tool from Anthropic. Users describe tasks in plain English — Cl
 
 | Concern | How it's addressed |
 |---|---|
-| Agent accesses sensitive data | OS-level sandbox blocks access to SSH keys, AWS credentials, and other sensitive files on the machine. |
+| Agent accesses sensitive data | Permission deny rules block Read/Edit access to sensitive paths (~/.ssh, ~/.aws, ~/.env). Managed settings prevent override. |
 | Agent makes unauthorized changes | All changes go through Pull Requests. Nothing reaches production without human review. |
 | Prompt injection (poisoned content) | Even if injection succeeds, there are no secrets to steal, dangerous commands are denied, and nothing deploys without PR review. |
 | Secrets leak | No secrets exist in the workspace. Scheduled CI runs use scoped GitHub Secrets that Claude never sees. |
@@ -31,14 +31,14 @@ No single layer is sufficient alone.
 |---|---|---|
 | **CLAUDE.md** | Behavioral rules: PR-only workflow, don't access secrets, treat external content as untrusted | **Advisory** — Claude follows these but nothing technically prevents violation |
 | **GitHub controls** | Branch protection, CODEOWNERS, required reviews, CI checks | **Enforced by GitHub** — no code reaches `main` without review |
-| **Claude Code sandbox** | OS-level filesystem restrictions, dangerous commands denied | **Enforced at OS level** — IT deploys managed settings the user can't override |
+| **Claude Code managed settings** | Permission deny rules block sensitive file access (Read/Edit) and destructive commands (Bash). Enterprise lock flags prevent local override. | **Enforced by Claude Code** — IT deploys managed settings the user can't override. Deny rules evaluated before allow rules. |
 
 **CLAUDE.md alone is not enough.** All three layers must be active. See [`it-checklist.md`](it-checklist.md) for setup.
 
 ### Known limitations (be honest with IT about these)
 
-- **Permission deny rules have confirmed bugs** in Claude Code's Read/Write tools. The OS-level sandbox is the real enforcement for filesystem restrictions.
-- **Python code can call subprocess/os modules** which could bypass shell-level command denies. The sandbox filesystem restrictions still apply, and all code must pass PR review before merging.
+- **Permission deny rules have had bugs** in Claude Code. Managed settings with `allowManagedPermissionRulesOnly` provide the strongest enforcement. Verify deny rules are working during the verification step.
+- **Python code can call subprocess/os modules** which could bypass shell-level command denies. All code must pass PR review before merging — this is the control for code-level bypasses.
 - **Prompt injection defense is advisory.** CLAUDE.md tells Claude to parse deterministically, but there is no technical enforcement that prevents it from writing non-deterministic code. Code review is the control.
 - **Merged code can access CI secrets.** If scheduled workflows use secrets, a malicious PR that passes review could exfiltrate them. Mitigate with protected GitHub Environments requiring deployment reviewers.
 
@@ -82,12 +82,28 @@ This is a hard control, not optional. It protects itself — can't be silently m
 ```json
 {
   "allowManagedPermissionRulesOnly": true,
-  "disableBypassPermissionsMode": true,
+  "disableBypassPermissionsMode": "disable",
   "permissions": {
     "deny": [
+      "Read(~/.ssh)",
+      "Read(~/.ssh/**)",
+      "Read(~/.aws)",
+      "Read(~/.aws/**)",
+      "Read(~/.gnupg)",
+      "Read(~/.gnupg/**)",
+      "Read(~/.env)",
+      "Read(~/.env.*)",
+      "Read(~/.config/gcloud/**)",
+      "Read(~/.claude/memory/**)",
+      "Edit(~/.ssh/**)",
+      "Edit(~/.aws/**)",
+      "Edit(~/.bashrc)",
+      "Edit(~/.zshrc)",
+      "Edit(~/.profile)",
       "Bash(rm -rf *)",
       "Bash(curl * | *)",
-      "Bash(wget * | *)",
+      "Bash(curl * -o *)",
+      "Bash(wget *)",
       "Bash(pip install *)",
       "Bash(pip3 install *)",
       "Bash(python -m pip *)",
@@ -102,23 +118,14 @@ This is a hard control, not optional. It protects itself — can't be silently m
       "Bash(git remote set-url *)",
       "Bash(git config *)"
     ]
-  },
-  "sandbox": {
-    "filesystem": {
-      "deniedPaths": [
-        "~/.ssh",
-        "~/.aws",
-        "~/.config",
-        "~/.env",
-        "~/.gnupg",
-        "~/.claude/memory"
-      ]
-    }
   }
 }
 ```
 
-`allowManagedPermissionRulesOnly` ensures local/project settings can't override these denies. `disableBypassPermissionsMode` prevents the analyst from entering unrestricted mode.
+- `allowManagedPermissionRulesOnly` — local/project settings cannot override these deny rules
+- `disableBypassPermissionsMode` — prevents the user from entering unrestricted mode
+- `Read()`/`Edit()` deny rules block sensitive file access across all tools
+- `Bash()` deny rules block destructive and unauthorized commands
 
 **Why no network restrictions?** Users already have internet on their machines. Restricting Claude's web access adds friction without security benefit — the workspace has no secrets and nothing deploys without review.
 
@@ -175,7 +182,7 @@ If output delivery to external systems is needed, IT adds scoped secrets to the 
 ## IT security FAQ
 
 **Q: Can Claude Code access the user's email, files, or credentials?**
-Claude Code can technically access files on the machine. That's why managed settings are critical — they block sensitive paths (~/.ssh, ~/.aws, ~/.env) at the OS level. Without the sandbox, protection is advisory only. With it, access is physically blocked.
+Claude Code can technically access files on the machine. That's why managed settings are critical — they include `Read()` and `Edit()` deny rules that block access to sensitive paths (~/.ssh, ~/.aws, ~/.env). The `allowManagedPermissionRulesOnly` flag ensures these can't be overridden by local or project settings. Without managed settings, protection is advisory only.
 
 **Q: Can Claude push directly to main?**
 Branch protection prevents this. Claude can push to feature branches and open PRs — it cannot push to `main`.

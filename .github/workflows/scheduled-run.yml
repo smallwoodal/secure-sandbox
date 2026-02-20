@@ -14,9 +14,10 @@ jobs:
   run-pipelines:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # IMPORTANT: If this workflow uses secrets, it MUST use a protected environment.
-    # Configure the environment in GitHub Settings → Environments with required reviewers.
-    # environment: production
+    # Protected environment requires deployment reviewers before running.
+    # Configure in GitHub Settings → Environments → "production".
+    # This prevents merged code from silently exfiltrating secrets.
+    environment: production
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 

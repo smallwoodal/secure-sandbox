@@ -35,12 +35,28 @@ CLAUDE.md is advisory. The sandbox provides actual OS-level enforcement. Deploy 
 ```json
 {
   "allowManagedPermissionRulesOnly": true,
-  "disableBypassPermissionsMode": true,
+  "disableBypassPermissionsMode": "disable",
   "permissions": {
     "deny": [
+      "Read(~/.ssh)",
+      "Read(~/.ssh/**)",
+      "Read(~/.aws)",
+      "Read(~/.aws/**)",
+      "Read(~/.gnupg)",
+      "Read(~/.gnupg/**)",
+      "Read(~/.env)",
+      "Read(~/.env.*)",
+      "Read(~/.config/gcloud/**)",
+      "Read(~/.claude/memory/**)",
+      "Edit(~/.ssh/**)",
+      "Edit(~/.aws/**)",
+      "Edit(~/.bashrc)",
+      "Edit(~/.zshrc)",
+      "Edit(~/.profile)",
       "Bash(rm -rf *)",
       "Bash(curl * | *)",
-      "Bash(wget * | *)",
+      "Bash(curl * -o *)",
+      "Bash(wget *)",
       "Bash(pip install *)",
       "Bash(pip3 install *)",
       "Bash(python -m pip *)",
@@ -55,24 +71,14 @@ CLAUDE.md is advisory. The sandbox provides actual OS-level enforcement. Deploy 
       "Bash(git remote set-url *)",
       "Bash(git config *)"
     ]
-  },
-  "sandbox": {
-    "filesystem": {
-      "deniedPaths": [
-        "~/.ssh",
-        "~/.aws",
-        "~/.config",
-        "~/.env",
-        "~/.gnupg",
-        "~/.claude/memory"
-      ]
-    }
   }
 }
 ```
 
-`allowManagedPermissionRulesOnly` — local/project settings cannot override these denies.
-`disableBypassPermissionsMode` — prevents the user from entering unrestricted mode.
+- `allowManagedPermissionRulesOnly` — local/project settings cannot override these deny rules
+- `disableBypassPermissionsMode` — prevents the user from entering unrestricted mode
+- `Read()`/`Edit()` rules block sensitive file access across all Claude Code tools
+- `Bash()` rules block destructive and unauthorized shell commands
 
 **Note:** Claude can push to feature branches (needed to open PRs) but cannot push to `main` or force-push. Branch protection is the backstop.
 
@@ -80,9 +86,9 @@ CLAUDE.md is advisory. The sandbox provides actual OS-level enforcement. Deploy 
 - [ ] Verify managed settings cannot be overridden by the analyst
 
 ### Known limitations
-- Permission `deny` rules for Read/Write tools have confirmed bugs in Claude Code — they may not block file reads via alternative tools
-- The OS-level sandbox **does** enforce filesystem restrictions — this is the real backstop
-- Sub-agents may bypass some permission rules — the sandbox catches this
+- Permission deny rules have had bugs in Claude Code — `allowManagedPermissionRulesOnly` provides the strongest enforcement by preventing local overrides
+- Command deny patterns match specific strings — creative command variations may bypass them. PR review is the backstop for code-level bypasses.
+- The deny list is a partial control, not comprehensive. It blocks common dangerous patterns but cannot anticipate every variant.
 
 ## 6. Analyst machine setup
 - [ ] Install Claude Code: `npm install -g @anthropic-ai/claude-code`
