@@ -64,11 +64,11 @@ CLAUDE.md is advisory. The sandbox provides actual OS-level enforcement. Deploy 
       "Bash(git stash *)",
       "Bash(git push origin *)",
       "Bash(gh pr create *)",
-      "Bash(gh pr view *)"
+      "Bash(gh pr view *)",
+      "WebFetch",
+      "WebSearch"
     ],
     "deny": [
-      "WebFetch",
-      "WebSearch",
       "Read(~/.ssh)",
       "Read(~/.ssh/**)",
       "Read(~/.aws)",
@@ -126,8 +126,7 @@ CLAUDE.md is advisory. The sandbox provides actual OS-level enforcement. Deploy 
 - `strictKnownMarketplaces: true` — restricts marketplace/plugin installations to verified sources only
 - `permissions.defaultMode: "dontAsk"` — auto-denies any tool not in the managed allow list. No permission prompts to social-engineer.
 - `permissions.disableBypassPermissionsMode` — prevents unrestricted mode
-- `permissions.allow` — the explicit allowlist of tools Claude can use. **IT controls this list.** Adjust for your team's needs. `Bash(python *)` is broad — for tighter control, replace with specific commands like `Bash(python src/*)`.
-- `WebFetch`/`WebSearch` deny — blocks Claude's built-in web browsing. **Remove these two lines if analysts need web access** — see Known Limitations for tradeoffs.
+- `permissions.allow` — the explicit allowlist of tools Claude can use. **IT controls this list.** Includes WebFetch/WebSearch (web browsing — same access the analyst already has). `Bash(python *)` is broad — for tighter control, replace with specific commands like `Bash(python src/*)`. For maximum lockdown, move WebFetch/WebSearch to the deny list.
 - `Read()`/`Edit()` deny rules — block Claude's file tools from sensitive paths
 - `Bash()` deny rules — block destructive and unauthorized shell commands. Deny always overrides allow.
 - `sandbox.enabled` + `allowUnsandboxedCommands: false` — OS-level Bash isolation with no escape hatch
@@ -144,7 +143,7 @@ CLAUDE.md is advisory. The sandbox provides actual OS-level enforcement. Deploy 
 - Command deny patterns match specific strings. Creative variations may bypass them. PR review is the backstop for code-level bypasses.
 - The deny list is partial, not comprehensive. It blocks common dangerous patterns but cannot anticipate every variant.
 - Sandbox reads are unrestricted by default — Bash can read files outside the working directory. Writes are restricted. The network allowlist prevents exfiltration of read data.
-- Web browsing (WebFetch/WebSearch) is denied by default. If you remove these deny rules to give analysts web access, web browsing becomes an exfiltration vector not covered by the sandbox network allowlist. Accept this tradeoff explicitly if enabled.
+- Claude's web browsing (WebFetch/WebSearch) is unrestricted — the sandbox network allowlist only affects Bash commands. This is the same access the analyst already has via their browser. For maximum lockdown, move WebFetch/WebSearch from the allow list to the deny list.
 
 ## 6. Analyst machine setup
 - [ ] Install Claude Code: `npm install -g @anthropic-ai/claude-code`
@@ -159,8 +158,7 @@ Test that each layer is working:
 - [ ] **Read tool deny test:** Ask Claude `Show me ~/.ssh/id_rsa` — the Read tool should be blocked by deny rules
 - [ ] **Bash network deny test:** Ask Claude `Run: curl https://webhook.site/test` — should be blocked by sandbox network restrictions (domain not in allowlist)
 - [ ] **Bash command deny test:** Ask Claude `Run: rm -rf /` — should be denied by Bash permission rules
-- [ ] **dontAsk mode test:** Ask Claude to use a tool not in the project allow list — should be auto-denied (no prompt)
-- [ ] **WebFetch deny test:** Ask Claude to fetch a webpage — should be blocked by WebFetch deny rule
+- [ ] **dontAsk mode test:** Ask Claude to use a tool not in the managed allow list — should be auto-denied (no prompt)
 - [ ] **PR workflow test:** Analyst makes a test request and opens a PR
 - [ ] **CI test:** IT reviews the test PR, verifies CI checks pass
 - [ ] **Scheduled run test:** Merge and confirm scheduled workflow runs (or trigger manually)
