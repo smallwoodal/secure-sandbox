@@ -28,9 +28,9 @@
       "Read(~/.env)",
       "Read(~/.env.*)",
       "Read(~/.config/gcloud/**)",
+      "Read(~/.claude/memory/**)",
       "Edit(~/.ssh/**)",
       "Edit(~/.aws/**)",
-      "Edit(~/.gnupg/**)",
       "Edit(~/.bashrc)",
       "Edit(~/.zshrc)",
       "Edit(~/.profile)",
@@ -52,5 +52,8 @@
       "Bash(git remote set-url *)",
       "Bash(git config *)"
     ]
+  },
+  "sandbox": {
+    "enabled": true
   }
 }

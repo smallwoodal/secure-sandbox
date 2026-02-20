@@ -35,6 +35,7 @@ CLAUDE.md is advisory. The sandbox provides actual OS-level enforcement. Deploy 
 ```json
 {
   "allowManagedPermissionRulesOnly": true,
+  "allowManagedHooksOnly": true,
   "disableBypassPermissionsMode": "disable",
   "permissions": {
     "deny": [
@@ -71,24 +72,43 @@ CLAUDE.md is advisory. The sandbox provides actual OS-level enforcement. Deploy 
       "Bash(git remote set-url *)",
       "Bash(git config *)"
     ]
-  }
+  },
+  "sandbox": {
+    "enabled": true,
+    "network": {
+      "allowedDomains": [
+        "github.com",
+        "api.github.com",
+        "pypi.org",
+        "files.pythonhosted.org"
+      ]
+    }
+  },
+  "deniedMcpServers": [{ "serverName": "*" }]
 }
 ```
 
-- `allowManagedPermissionRulesOnly` — local/project settings cannot override these deny rules
-- `disableBypassPermissionsMode` — prevents the user from entering unrestricted mode
-- `Read()`/`Edit()` rules block sensitive file access across all Claude Code tools
-- `Bash()` rules block destructive and unauthorized shell commands
+**What each layer does:**
+- `allowManagedPermissionRulesOnly` — prevents local/project settings from overriding denies
+- `allowManagedHooksOnly` — blocks user/project hooks
+- `disableBypassPermissionsMode` — prevents unrestricted mode
+- `Read()`/`Edit()` deny rules — block Claude's file tools from sensitive paths
+- `Bash()` deny rules — block destructive and unauthorized shell commands
+- `sandbox.enabled` — OS-level Bash isolation (restricts writes to working directory)
+- `sandbox.network.allowedDomains` — restricts outbound network from Bash commands. **Claude's built-in web browsing is not affected** — only shell commands (curl, python scripts, etc.)
+- `deniedMcpServers` — blocks all MCP server connections
 
-**Note:** Claude can push to feature branches (needed to open PRs) but cannot push to `main` or force-push. Branch protection is the backstop.
+**Note:** Claude can push to feature branches (needed for PRs) but cannot push to `main`. Add domains to `allowedDomains` as analysts need new integrations.
 
 - [ ] Deploy managed settings file to analyst machine(s)
-- [ ] Verify managed settings cannot be overridden by the analyst
+- [ ] Verify managed settings cannot be overridden
+- [ ] Add scraper-specific domains to `allowedDomains` as needed
 
-### Known limitations
-- Permission deny rules have had bugs in Claude Code — `allowManagedPermissionRulesOnly` provides the strongest enforcement by preventing local overrides
-- Command deny patterns match specific strings — creative command variations may bypass them. PR review is the backstop for code-level bypasses.
-- The deny list is a partial control, not comprehensive. It blocks common dangerous patterns but cannot anticipate every variant.
+### Known limitations (be transparent with security reviewers)
+- `Read()`/`Edit()` deny rules only block those specific tools — a Bash command like `cat ~/.ssh/id_rsa` is a separate surface. The sandbox network restrictions mitigate this: even if Bash reads a sensitive file, it can't send it to an unlisted domain.
+- Command deny patterns match specific strings. Creative variations may bypass them. PR review is the backstop for code-level bypasses.
+- The deny list is partial, not comprehensive. It blocks common dangerous patterns but cannot anticipate every variant.
+- Sandbox reads are unrestricted by default — Bash can read files outside the working directory. Writes are restricted. The network allowlist prevents exfiltration of read data.
 
 ## 6. Analyst machine setup
 - [ ] Install Claude Code: `npm install -g @anthropic-ai/claude-code`

@@ -4,7 +4,7 @@ A template repo for using Claude Code securely in regulated environments.
 
 **How it works:** Users describe tasks in plain English. Claude Code writes the code, adds tests, and opens a Pull Request. Nothing goes live without review. Scheduled execution runs in GitHub Actions.
 
-**Why it's safe:** The workspace has no secrets. Permission rules block access to sensitive files and deny destructive commands. All changes require PR review. Same security model as onboarding a junior developer — limited access, code review, CI gates.
+**Why it's safe:** The workspace has no secrets. Permission rules block access to sensitive files. Bash commands are sandboxed with network restrictions. All changes require PR review. Same security model as onboarding a junior developer — limited access, code review, CI gates.
 
 ## Getting started
 

@@ -5,7 +5,7 @@ Users describe tasks in natural language → Claude Code writes and maintains co
 
 ## Security model
 - Claude Code is the **front-end** for natural language requests.
-- All work happens in a **sealed workspace** tied to this GitHub repo.
+- All work happens in a **sandboxed workspace** tied to this GitHub repo.
 - Claude only edits files in the repo and proposes changes via PR.
 - Scheduled execution happens in GitHub Actions with controlled permissions.
 - Prompt injection is assumed to exist. The system is designed so that even if injection succeeds, blast radius is minimal.
