@@ -1,5 +1,8 @@
-# Security-sensitive files require IT review before merge.
-# Replace @your-org/it-security with your actual GitHub team.
+# REQUIRED: Replace @your-org/it-security with your actual GitHub team slug.
+# This file is non-functional until real team slugs are configured.
+# CODEOWNERS protects itself — changes to this file require IT review.
+#
+# Verify with: gh api repos/OWNER/REPO/collaborators --jq '.[].login'
 
 CLAUDE.md                    @your-org/it-security
 .claude/**                   @your-org/it-security

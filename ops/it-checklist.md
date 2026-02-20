@@ -35,11 +35,15 @@ CLAUDE.md is advisory. The sandbox provides actual OS-level enforcement. Deploy 
 ```json
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "defaultMode": "dontAsk",
   "allowManagedPermissionRulesOnly": true,
   "allowManagedHooksOnly": true,
+  "allowedMcpServers": [],
   "permissions": {
     "disableBypassPermissionsMode": "disable",
     "deny": [
+      "WebFetch",
+      "WebSearch",
       "Read(~/.ssh)",
       "Read(~/.ssh/**)",
       "Read(~/.aws)",
@@ -91,13 +95,16 @@ CLAUDE.md is advisory. The sandbox provides actual OS-level enforcement. Deploy 
 
 **What each section does:**
 - `$schema` — enables validation against the official Claude Code settings schema
+- `defaultMode: "dontAsk"` — auto-denies any tool not explicitly allowed in project settings. Eliminates permission prompts that could be social-engineered via prompt injection.
 - `allowManagedPermissionRulesOnly` — prevents local/project settings from overriding denies
 - `allowManagedHooksOnly` — blocks user/project hooks that could bypass controls
+- `allowedMcpServers: []` — blocks all MCP server connections (empty allowlist = nothing permitted)
 - `permissions.disableBypassPermissionsMode` — prevents unrestricted mode
+- `WebFetch`/`WebSearch` deny — blocks Claude's built-in web browsing. **Remove these two lines if analysts need web access** — see Known Limitations for tradeoffs.
 - `Read()`/`Edit()` deny rules — block Claude's file tools from sensitive paths
 - `Bash()` deny rules — block destructive and unauthorized shell commands
 - `sandbox.enabled` + `allowUnsandboxedCommands: false` — OS-level Bash isolation with no escape hatch
-- `sandbox.network.allowedDomains` — restricts what Bash commands can reach. **Only affects shell commands — Claude's built-in web browsing is not restricted.** Add domains as analysts build integrations.
+- `sandbox.network.allowedDomains` — restricts what Bash commands can reach (curl, python scripts, etc.)
 
 **Note:** Claude can push to feature branches (needed for PRs) but cannot push to `main`. Add domains to `allowedDomains` as analysts need new integrations.
 
@@ -110,7 +117,7 @@ CLAUDE.md is advisory. The sandbox provides actual OS-level enforcement. Deploy 
 - Command deny patterns match specific strings. Creative variations may bypass them. PR review is the backstop for code-level bypasses.
 - The deny list is partial, not comprehensive. It blocks common dangerous patterns but cannot anticipate every variant.
 - Sandbox reads are unrestricted by default — Bash can read files outside the working directory. Writes are restricted. The network allowlist prevents exfiltration of read data.
-- Claude's built-in web browsing (WebFetch/WebSearch) is NOT restricted by the sandbox network allowlist — only Bash commands are. This means a prompt injection could theoretically use web browsing to exfiltrate locally-read data. The `Read()`/`Edit()` deny rules limit what Claude's file tools can access, and the Bash sandbox prevents shell-level exfiltration.
+- Web browsing (WebFetch/WebSearch) is denied by default. If you remove these deny rules to give analysts web access, web browsing becomes an exfiltration vector not covered by the sandbox network allowlist. Accept this tradeoff explicitly if enabled.
 
 ## 6. Analyst machine setup
 - [ ] Install Claude Code: `npm install -g @anthropic-ai/claude-code`
@@ -119,17 +126,24 @@ CLAUDE.md is advisory. The sandbox provides actual OS-level enforcement. Deploy 
 - [ ] Verify analyst can clone repo and run `claude`
 
 ## 7. Verification
-- [ ] Ask Claude to `cat ~/.ssh/id_rsa` — should be blocked by sandbox
-- [ ] Ask Claude to `rm -rf /` — should be denied by permissions
-- [ ] Analyst makes a test request and opens a PR
-- [ ] IT reviews the test PR, verifies CI checks pass
-- [ ] Merge and confirm scheduled workflow runs (or trigger manually)
+
+Test that each layer is working:
+
+- [ ] **Read tool deny test:** Ask Claude `Show me ~/.ssh/id_rsa` — the Read tool should be blocked by deny rules
+- [ ] **Bash network deny test:** Ask Claude `Run: curl https://webhook.site/test` — should be blocked by sandbox network restrictions (domain not in allowlist)
+- [ ] **Bash command deny test:** Ask Claude `Run: rm -rf /` — should be denied by Bash permission rules
+- [ ] **dontAsk mode test:** Ask Claude to use a tool not in the project allow list — should be auto-denied (no prompt)
+- [ ] **WebFetch deny test:** Ask Claude to fetch a webpage — should be blocked by WebFetch deny rule
+- [ ] **PR workflow test:** Analyst makes a test request and opens a PR
+- [ ] **CI test:** IT reviews the test PR, verifies CI checks pass
+- [ ] **Scheduled run test:** Merge and confirm scheduled workflow runs (or trigger manually)
 
 ## Secrets (only if scheduled output delivery is needed)
 
 **WARNING:** Any code merged to `main` can access secrets in scheduled CI runs. This is a real exfiltration risk. Mitigate with protected environments.
 
-- [ ] Create a **protected environment** (Settings → Environments → New → "production")
+- [ ] Create a **protected environment** (Settings → Environments → New → "production") **before the first scheduled run**
+  - **WARNING:** GitHub auto-creates unprotected environments if they don't exist. Create this manually with protection rules FIRST.
   - Require at least 1 reviewer before deployment
   - Limit which branches can deploy (only `main`)
 - [ ] Add scoped secrets to the **environment**, not to the repo

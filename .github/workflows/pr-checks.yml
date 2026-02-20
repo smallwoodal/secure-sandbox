@@ -32,6 +32,20 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Validate CODEOWNERS is configured
+        run: |
+          # Fail if CODEOWNERS still has placeholder team slugs
+          if grep -q '@your-org/it-security' CODEOWNERS; then
+            echo "ERROR: CODEOWNERS still has placeholder team slugs (@your-org/it-security)."
+            echo "Replace with real GitHub team slugs before using this repo."
+            exit 1
+          fi
+          # Fail if CODEOWNERS is missing
+          if [ ! -f CODEOWNERS ]; then
+            echo "ERROR: CODEOWNERS file is missing — this is a required security control."
+            exit 1
+          fi
+
       - name: Scan for secrets (gitleaks)
         uses: gitleaks/gitleaks-action@44c470ffc35caa3b1b2510a2f2d1588a5d2537cc # v2.3.7
         env:

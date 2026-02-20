@@ -6,7 +6,11 @@ on:
     - cron: "0 8 * * 1-5"
   workflow_dispatch: # Allow manual trigger
 
-# Scoped permissions — only what's needed
+# Scoped permissions — only what's needed.
+# Note: 'environment: production' below requires the environment to exist
+# with protection rules (required reviewers). GitHub auto-creates unprotected
+# environments if they don't exist — IT must create the environment FIRST
+# with deployment reviewers configured, before this workflow runs.
 permissions:
   contents: read
 
