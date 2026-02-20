@@ -34,8 +34,10 @@ jobs:
             echo "::error::Without protection rules, merged code can access secrets unchecked."
             exit 1
           elif [ "$RULES" = "unknown" ]; then
-            echo "::warning::Could not verify environment protection rules (API access may be restricted)."
-            echo "::warning::Manually verify: Settings → Environments → production → Required reviewers."
+            echo "::error::Could not verify environment protection rules (API access may be restricted)."
+            echo "::error::Manually verify: Settings → Environments → production → Required reviewers."
+            echo "::error::Failing closed — cannot confirm environment is protected."
+            exit 1
           else
             echo "Environment has $RULES protection rule(s) configured."
           fi
@@ -45,10 +47,10 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install dependencies
+      - name: Install dependencies (hash-verified)
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install --require-hashes -r requirements.txt
 
       - name: Run pipelines
         run: |

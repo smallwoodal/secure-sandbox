@@ -40,7 +40,7 @@ No single layer is sufficient alone.
 - **Read/Edit deny rules only block those specific tools.** A Bash command like `cat ~/.ssh/id_rsa` is not blocked by `Read(~/.ssh/**)`. The Bash sandbox network restrictions mitigate this — even if Bash reads a file, it can't send it to an unlisted domain.
 - **`Bash(python *)` in the allow list is broad.** Python scripts can call subprocess/os modules, bypassing shell-level command denies. The sandbox network restrictions limit where data can go. For tighter control, replace with specific patterns like `Bash(python src/*)` or audited wrapper scripts. PR review is the backstop.
 - **Sandbox Bash reads are unrestricted by default.** Bash can read files outside the working directory. Writes are restricted to the working directory. The network allowlist prevents exfiltration.
-- **Claude's web browsing is unrestricted.** The sandbox network allowlist only affects Bash commands. Claude's WebFetch/WebSearch tools work like a normal browser — same access the analyst already has. A prompt injection could theoretically use web browsing to exfiltrate locally-read data, but the Bash sandbox blocks the more dangerous shell-level vector. For maximum lockdown, IT can move WebFetch/WebSearch from the allow list to the deny list.
+- **Claude's web browsing is unrestricted.** The sandbox network allowlist only affects Bash commands. Claude's WebFetch/WebSearch are allowed because analysts need web access for research and testing. However, autonomous tool-driven exfiltration is a different risk class than human browsing — a prompt injection can trigger it faster and less visibly. The Bash sandbox blocks shell-level exfiltration (the more dangerous vector). For maximum lockdown, move WebFetch/WebSearch from the allow list to the deny list.
 - **Prompt injection defense is advisory.** CLAUDE.md tells Claude to parse deterministically, but there is no technical enforcement that prevents it from writing non-deterministic code. Code review is the control.
 - **Merged code can access CI secrets.** If scheduled workflows use secrets, a malicious PR that passes review could exfiltrate them. Mitigate with protected GitHub Environments requiring deployment reviewers.
 
@@ -87,7 +87,7 @@ This is a hard control, not optional. It protects itself — can't be silently m
   "allowManagedPermissionRulesOnly": true,
   "allowManagedHooksOnly": true,
   "allowedMcpServers": [],
-  "strictKnownMarketplaces": true,
+  "strictKnownMarketplaces": [],
   "permissions": {
     "defaultMode": "dontAsk",
     "disableBypassPermissionsMode": "disable",
@@ -172,7 +172,7 @@ This is a hard control, not optional. It protects itself — can't be silently m
 - `allowManagedPermissionRulesOnly` — only permission rules in this file apply. Project/user-level rules are ignored. IT controls the full permission model.
 - `allowManagedHooksOnly` — blocks user/project hooks that could bypass controls
 - `allowedMcpServers: []` — blocks all MCP server connections (empty allowlist = nothing permitted)
-- `strictKnownMarketplaces: true` — restricts marketplace/plugin installations to verified sources only
+- `strictKnownMarketplaces: []` — empty array blocks all marketplace/plugin installations. Add approved marketplace sources to the array as needed.
 - `permissions.defaultMode: "dontAsk"` — auto-denies any tool not in the managed allow list above. No permission prompts to social-engineer.
 - `permissions.disableBypassPermissionsMode` — prevents unrestricted mode
 - `permissions.allow` — the explicit allowlist of tools Claude can use. **IT controls this list.** Includes WebFetch/WebSearch (web browsing — same access the analyst already has). `Bash(python *)` is broad by design — for tighter control, replace with specific commands like `Bash(python src/*)`. For maximum lockdown, move WebFetch/WebSearch to the deny list.

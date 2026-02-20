@@ -38,7 +38,7 @@ CLAUDE.md is advisory. The sandbox provides actual OS-level enforcement. Deploy 
   "allowManagedPermissionRulesOnly": true,
   "allowManagedHooksOnly": true,
   "allowedMcpServers": [],
-  "strictKnownMarketplaces": true,
+  "strictKnownMarketplaces": [],
   "permissions": {
     "defaultMode": "dontAsk",
     "disableBypassPermissionsMode": "disable",
@@ -123,7 +123,7 @@ CLAUDE.md is advisory. The sandbox provides actual OS-level enforcement. Deploy 
 - `allowManagedPermissionRulesOnly` — only permission rules in this file apply. Project/user-level rules are ignored. IT controls the full permission model.
 - `allowManagedHooksOnly` — blocks user/project hooks that could bypass controls
 - `allowedMcpServers: []` — blocks all MCP server connections (empty allowlist = nothing permitted)
-- `strictKnownMarketplaces: true` — restricts marketplace/plugin installations to verified sources only
+- `strictKnownMarketplaces: []` — empty array blocks all marketplace/plugin installations. Add approved marketplace sources to the array as needed.
 - `permissions.defaultMode: "dontAsk"` — auto-denies any tool not in the managed allow list. No permission prompts to social-engineer.
 - `permissions.disableBypassPermissionsMode` — prevents unrestricted mode
 - `permissions.allow` — the explicit allowlist of tools Claude can use. **IT controls this list.** Includes WebFetch/WebSearch (web browsing — same access the analyst already has). `Bash(python *)` is broad — for tighter control, replace with specific commands like `Bash(python src/*)`. For maximum lockdown, move WebFetch/WebSearch to the deny list.
@@ -143,7 +143,7 @@ CLAUDE.md is advisory. The sandbox provides actual OS-level enforcement. Deploy 
 - Command deny patterns match specific strings. Creative variations may bypass them. PR review is the backstop for code-level bypasses.
 - The deny list is partial, not comprehensive. It blocks common dangerous patterns but cannot anticipate every variant.
 - Sandbox reads are unrestricted by default — Bash can read files outside the working directory. Writes are restricted. The network allowlist prevents exfiltration of read data.
-- Claude's web browsing (WebFetch/WebSearch) is unrestricted — the sandbox network allowlist only affects Bash commands. This is the same access the analyst already has via their browser. For maximum lockdown, move WebFetch/WebSearch from the allow list to the deny list.
+- Claude's web browsing (WebFetch/WebSearch) is unrestricted — the sandbox network allowlist only affects Bash commands. Autonomous tool-driven exfiltration is a different risk class than human browsing (faster, less visible, prompt-injection triggerable). The Bash sandbox blocks shell-level exfil. For maximum lockdown, move WebFetch/WebSearch from the allow list to the deny list.
 
 ## 6. Analyst machine setup
 - [ ] Install Claude Code: `npm install -g @anthropic-ai/claude-code`

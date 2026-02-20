@@ -227,3 +227,132 @@ def test_tutorial_and_checklist_managed_settings_match():
     assert tutorial_settings == checklist_settings, (
         "Managed settings in tutorial and IT checklist do not match"
     )
+
+
+# --- Managed settings schema validation ---
+
+
+def _extract_managed_settings(text):
+    """Extract managed settings JSON block from a doc file."""
+    blocks = text.split("```json")
+    for block in blocks[1:]:
+        json_text = block.split("```")[0].strip()
+        try:
+            parsed = json.loads(json_text)
+            if "allowManagedPermissionRulesOnly" in parsed:
+                return parsed
+        except json.JSONDecodeError:
+            continue
+    return None
+
+
+def test_managed_settings_required_keys():
+    """Managed settings must contain all required security keys."""
+    for doc_path in [TUTORIAL_PATH, IT_CHECKLIST_PATH]:
+        settings = _extract_managed_settings(doc_path.read_text())
+        assert settings is not None, f"No managed settings found in {doc_path.name}"
+
+        required_top = [
+            "allowManagedPermissionRulesOnly",
+            "allowManagedHooksOnly",
+            "allowedMcpServers",
+            "strictKnownMarketplaces",
+        ]
+        for key in required_top:
+            assert key in settings, (
+                f"{doc_path.name} managed settings missing: {key}"
+            )
+
+        perms = settings.get("permissions", {})
+        required_perms = ["defaultMode", "disableBypassPermissionsMode", "allow", "deny"]
+        for key in required_perms:
+            assert key in perms, (
+                f"{doc_path.name} permissions missing: {key}"
+            )
+
+        sandbox = settings.get("sandbox", {})
+        assert sandbox.get("enabled") is True, f"{doc_path.name} sandbox not enabled"
+        assert sandbox.get("allowUnsandboxedCommands") is False, (
+            f"{doc_path.name} missing allowUnsandboxedCommands: false"
+        )
+
+
+def test_managed_settings_correct_types():
+    """Managed settings values must have correct types per schema."""
+    for doc_path in [TUTORIAL_PATH, IT_CHECKLIST_PATH]:
+        settings = _extract_managed_settings(doc_path.read_text())
+        assert settings is not None
+
+        # Boolean flags
+        assert settings["allowManagedPermissionRulesOnly"] is True
+        assert settings["allowManagedHooksOnly"] is True
+
+        # Arrays (not booleans or strings)
+        assert isinstance(settings["allowedMcpServers"], list), (
+            f"{doc_path.name}: allowedMcpServers must be an array"
+        )
+        assert isinstance(settings["strictKnownMarketplaces"], list), (
+            f"{doc_path.name}: strictKnownMarketplaces must be an array"
+        )
+
+        perms = settings["permissions"]
+        assert isinstance(perms["allow"], list), "permissions.allow must be an array"
+        assert isinstance(perms["deny"], list), "permissions.deny must be an array"
+        assert perms["defaultMode"] == "dontAsk", "defaultMode must be dontAsk"
+        assert perms["disableBypassPermissionsMode"] == "disable"
+
+        # defaultMode must be under permissions, not top-level
+        assert "defaultMode" not in settings, (
+            f"{doc_path.name}: defaultMode must be under permissions, not top-level"
+        )
+
+
+def test_managed_settings_deny_not_in_allow():
+    """No tool should appear in both allow and deny lists."""
+    for doc_path in [TUTORIAL_PATH, IT_CHECKLIST_PATH]:
+        settings = _extract_managed_settings(doc_path.read_text())
+        assert settings is not None
+        perms = settings["permissions"]
+        allow_set = set(perms["allow"])
+        deny_set = set(perms["deny"])
+        overlap = allow_set & deny_set
+        assert len(overlap) == 0, (
+            f"{doc_path.name}: tools in both allow and deny: {overlap}"
+        )
+
+
+# --- Workflow security checks ---
+
+
+def test_scheduled_workflow_fails_closed():
+    """Environment check must fail-closed (exit 1 on unknown), not fail-open."""
+    content = SCHEDULED_WORKFLOW_PATH.read_text()
+    # Find the section between 'unknown' check and the next branch/end
+    # and verify it contains 'exit 1'
+    lines = content.splitlines()
+    in_unknown_block = False
+    found_exit_1 = False
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+        if "unknown" in stripped:
+            in_unknown_block = True
+            continue
+        if in_unknown_block:
+            if "exit 1" in stripped:
+                found_exit_1 = True
+                break
+            # Stop at the next conditional branch or block end
+            if stripped.startswith("else") or stripped == "fi":
+                break
+    assert found_exit_1, (
+        "Scheduled workflow environment check must exit 1 on unknown (fail-closed)"
+    )
+
+
+def test_workflows_use_hash_verified_install():
+    """CI workflows must use --require-hashes for pip install."""
+    for workflow_path in [PR_WORKFLOW_PATH, SCHEDULED_WORKFLOW_PATH]:
+        content = workflow_path.read_text()
+        assert "--require-hashes" in content, (
+            f"{workflow_path.name} must use --require-hashes for pip install"
+        )
