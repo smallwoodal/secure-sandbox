@@ -1,20 +1,18 @@
 # IT Setup Checklist
 
-Use this checklist when provisioning a new secure-scraper-sandbox repo for a team.
+Use this checklist when provisioning a new secure-sandbox repo for a team.
 
-## Repository setup
-- [ ] Create private repo in GitHub organization
-- [ ] Push template files (or use GitHub template repo feature)
-- [ ] Verify `CLAUDE.md` is present and unmodified
+## 1. Repository setup
+- [ ] Create private repo in GitHub organization (use this repo as template)
+- [ ] Verify `CLAUDE.md` and `.claude/settings.json` are present and unmodified
 
-## Branch protection (Settings → Branches → `main`)
+## 2. Branch protection (Settings → Branches → `main`)
 - [ ] Require pull request before merging
 - [ ] Require at least 1 approval
 - [ ] Require status checks to pass (`PR Checks` workflow)
 - [ ] Do not allow bypassing the above settings
-- [ ] Restrict who can push to matching branches (optional)
 
-## CODEOWNERS (required — this is a hard control, not optional)
+## 3. CODEOWNERS (required — this is a hard control)
 - [ ] Add `CODEOWNERS` file requiring IT review for:
   - `CLAUDE.md`
   - `.claude/**`
@@ -22,23 +20,14 @@ Use this checklist when provisioning a new secure-scraper-sandbox repo for a tea
   - `requirements.txt`
   - `CODEOWNERS` (itself — prevents self-modification)
 
-## Access control
+## 4. Access control
 - [ ] Grant analyst(s) write access to the repo
 - [ ] Ensure IT security team has admin access
-- [ ] Enable audit log monitoring for the repo (if available on your plan)
+- [ ] Enable audit log monitoring (if available on your GitHub plan)
 
-## Secrets (only if scheduled output delivery is needed)
-- [ ] Add scoped secrets (e.g., `SHAREPOINT_TOKEN`) via Settings → Secrets → Actions
-- [ ] Document what each secret is for and its access scope
-- [ ] Set secret expiration reminders
+## 5. Deploy managed sandbox settings (CRITICAL)
 
-## Claude Code sandbox enforcement (CRITICAL — this is the real security layer)
-
-CLAUDE.md is advisory. The sandbox provides actual OS-level enforcement.
-
-### Option A: Managed settings (recommended — IT-controlled, analyst can't override)
-
-Place this file on the analyst's machine. It takes highest precedence over all other settings.
+CLAUDE.md is advisory. The sandbox provides actual OS-level enforcement. Deploy this file via MDM (Jamf, Intune, etc.) — analysts cannot override it.
 
 - **macOS**: `/Library/Application Support/ClaudeCode/managed-settings.json`
 - **Linux**: `/etc/claude-code/managed-settings.json`
@@ -51,8 +40,11 @@ Place this file on the analyst's machine. It takes highest precedence over all o
       "Bash(curl * | bash)",
       "Bash(wget * | bash)",
       "Bash(pip install *)",
-      "Bash(git push *)",
-      "Bash(git remote *)",
+      "Bash(git push --force *)",
+      "Bash(git push origin main)",
+      "Bash(git push origin master)",
+      "Bash(git remote add *)",
+      "Bash(git remote set-url *)",
       "Bash(git config *)"
     ]
   },
@@ -71,32 +63,30 @@ Place this file on the analyst's machine. It takes highest precedence over all o
 }
 ```
 
-**Why no network restrictions here?** Analysts already have unrestricted internet access on their machines (browser, terminal, etc.). Restricting Claude Code's web access during development adds friction without meaningful security benefit — the workspace has no secrets to exfiltrate, and nothing deploys without PR review. Network restrictions are enforced in CI/production instead (see GitHub Actions workflows).
+**Note:** Claude can push to feature branches (needed to open PRs) but cannot push to `main` or force-push. Branch protection is the backstop. No network restrictions — analysts already have internet access on their machines.
 
 - [ ] Deploy managed settings file to analyst machine(s)
 - [ ] Verify managed settings cannot be overridden by the analyst
 
-### Option B: Project settings (included in repo — weaker, analyst could modify locally)
+### Known limitations
+- Permission `deny` rules for Read/Write tools have confirmed bugs in Claude Code — they may not block file reads via alternative tools
+- The OS-level sandbox **does** enforce filesystem restrictions — this is the real backstop
+- Sub-agents may bypass some permission rules — the sandbox catches this
 
-The repo ships with `.claude/settings.json` which provides project-level sandbox config. This is a fallback if managed settings deployment isn't feasible.
-
-- [ ] Verify `.claude/settings.json` is present in the repo
-
-### Known limitations (be aware)
-- Permission `deny` rules for Read/Write tools have confirmed bugs (they may not block file reads)
-- The OS-level sandbox (`/sandbox` mode) **does** enforce restrictions — ensure analysts run in sandbox mode
-- Sub-agents may bypass some permission rules — the sandbox is the backstop
-
-## Analyst machine setup
+## 6. Analyst machine setup
 - [ ] Install Claude Code: `npm install -g @anthropic-ai/claude-code`
-- [ ] Provision Anthropic API key for the team
-- [ ] Instruct analyst to set `ANTHROPIC_API_KEY` as environment variable (never in a file)
-- [ ] Deploy managed settings (see above) before the analyst starts using Claude Code
-- [ ] Verify analyst can clone repo and run `claude` in the repo directory
+- [ ] Provision Anthropic API key (environment variable, never in a file)
+- [ ] Deploy managed settings (step 5) before the analyst starts
+- [ ] Verify analyst can clone repo and run `claude`
 
-## Verification
-- [ ] Analyst runs `claude` and confirms CLAUDE.md constraints are loaded
-- [ ] Test sandbox enforcement: ask Claude to `cat ~/.ssh/id_rsa` — should be blocked
+## 7. Verification
+- [ ] Ask Claude to `cat ~/.ssh/id_rsa` — should be blocked by sandbox
+- [ ] Ask Claude to `rm -rf /` — should be denied by permissions
 - [ ] Analyst makes a test request and opens a PR
-- [ ] IT reviews the test PR and verifies CI checks pass
-- [ ] Merge and confirm scheduled workflow runs (or trigger manually via workflow_dispatch)
+- [ ] IT reviews the test PR, verifies CI checks pass
+- [ ] Merge and confirm scheduled workflow runs (or trigger manually)
+
+## Secrets (only if scheduled output delivery is needed)
+- [ ] Add scoped secrets (e.g., `SHAREPOINT_TOKEN`) via Settings → Secrets → Actions
+- [ ] Document what each secret is for and its scope
+- [ ] Set expiration reminders
