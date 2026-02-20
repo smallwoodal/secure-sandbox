@@ -4,7 +4,6 @@
       "Read",
       "Glob",
       "Grep",
-      "Bash(python *)",
       "Bash(pytest *)",
       "Bash(git add *)",
       "Bash(git commit *)",
@@ -21,12 +20,18 @@
     ],
     "deny": [
       "Bash(rm -rf *)",
-      "Bash(curl * | bash)",
-      "Bash(wget * | bash)",
+      "Bash(curl * | *)",
+      "Bash(wget * | *)",
       "Bash(pip install *)",
+      "Bash(pip3 install *)",
+      "Bash(python -m pip *)",
+      "Bash(python3 -m pip *)",
       "Bash(git push --force *)",
+      "Bash(git push -f *)",
       "Bash(git push origin main)",
       "Bash(git push origin master)",
+      "Bash(git push origin HEAD:main)",
+      "Bash(git push origin HEAD:master)",
       "Bash(git remote add *)",
       "Bash(git remote set-url *)",
       "Bash(git config *)"
@@ -34,8 +39,6 @@
   },
   "sandbox": {
     "filesystem": {
-      "writablePaths": [],
-      "readablePaths": [],
       "deniedPaths": [
         "~/.ssh",
         "~/.aws",

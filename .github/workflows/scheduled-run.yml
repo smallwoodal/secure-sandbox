@@ -6,18 +6,22 @@ on:
     - cron: "0 8 * * 1-5"
   workflow_dispatch: # Allow manual trigger
 
-# Scoped permissions — only what's needed to run pipelines
+# Scoped permissions — only what's needed
 permissions:
   contents: read
 
 jobs:
   run-pipelines:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # IMPORTANT: If this workflow uses secrets, it MUST use a protected environment.
+    # Configure the environment in GitHub Settings → Environments with required reviewers.
+    # environment: production
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: "3.12"
 
@@ -27,15 +31,15 @@ jobs:
           pip install -r requirements.txt
 
       - name: Run pipelines
-        run: python pipelines/run_all.py
-        # env:
-        #   If secrets are needed for output delivery (e.g., SharePoint upload),
-        #   add them as scoped repository secrets and uncomment:
-        #   SHAREPOINT_TOKEN: ${{ secrets.SHAREPOINT_TOKEN }}
+        run: |
+          # Add your pipeline entry point here after building it.
+          # Example: python src/pipeline.py
+          echo "No pipelines configured yet."
 
       - name: Upload outputs as artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: pipeline-outputs
           path: output/
           retention-days: 30
+          if-no-files-found: ignore

@@ -35,6 +35,13 @@ No single layer is sufficient alone.
 
 **CLAUDE.md alone is not enough.** All three layers must be active. See [`it-checklist.md`](it-checklist.md) for setup.
 
+### Known limitations (be honest with IT about these)
+
+- **Permission deny rules have confirmed bugs** in Claude Code's Read/Write tools. The OS-level sandbox is the real enforcement for filesystem restrictions.
+- **Python code can call subprocess/os modules** which could bypass shell-level command denies. The sandbox filesystem restrictions still apply, and all code must pass PR review before merging.
+- **Prompt injection defense is advisory.** CLAUDE.md tells Claude to parse deterministically, but there is no technical enforcement that prevents it from writing non-deterministic code. Code review is the control.
+- **Merged code can access CI secrets.** If scheduled workflows use secrets, a malicious PR that passes review could exfiltrate them. Mitigate with protected GitHub Environments requiring deployment reviewers.
+
 ---
 
 ## Setup (6 steps)
@@ -74,15 +81,23 @@ This is a hard control, not optional. It protects itself — can't be silently m
 
 ```json
 {
+  "allowManagedPermissionRulesOnly": true,
+  "disableBypassPermissionsMode": true,
   "permissions": {
     "deny": [
       "Bash(rm -rf *)",
-      "Bash(curl * | bash)",
-      "Bash(wget * | bash)",
+      "Bash(curl * | *)",
+      "Bash(wget * | *)",
       "Bash(pip install *)",
+      "Bash(pip3 install *)",
+      "Bash(python -m pip *)",
+      "Bash(python3 -m pip *)",
       "Bash(git push --force *)",
+      "Bash(git push -f *)",
       "Bash(git push origin main)",
       "Bash(git push origin master)",
+      "Bash(git push origin HEAD:main)",
+      "Bash(git push origin HEAD:master)",
       "Bash(git remote add *)",
       "Bash(git remote set-url *)",
       "Bash(git config *)"
@@ -102,6 +117,8 @@ This is a hard control, not optional. It protects itself — can't be silently m
   }
 }
 ```
+
+`allowManagedPermissionRulesOnly` ensures local/project settings can't override these denies. `disableBypassPermissionsMode` prevents the analyst from entering unrestricted mode.
 
 **Why no network restrictions?** Users already have internet on their machines. Restricting Claude's web access adds friction without security benefit — the workspace has no secrets and nothing deploys without review.
 

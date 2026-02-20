@@ -1,0 +1,8 @@
+# Security-sensitive files require IT review before merge.
+# Replace @your-org/it-security with your actual GitHub team.
+
+CLAUDE.md                    @your-org/it-security
+.claude/**                   @your-org/it-security
+.github/workflows/           @your-org/it-security
+requirements.txt             @your-org/it-security
+CODEOWNERS                   @your-org/it-security

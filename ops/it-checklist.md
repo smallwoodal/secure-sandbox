@@ -34,15 +34,23 @@ CLAUDE.md is advisory. The sandbox provides actual OS-level enforcement. Deploy 
 
 ```json
 {
+  "allowManagedPermissionRulesOnly": true,
+  "disableBypassPermissionsMode": true,
   "permissions": {
     "deny": [
       "Bash(rm -rf *)",
-      "Bash(curl * | bash)",
-      "Bash(wget * | bash)",
+      "Bash(curl * | *)",
+      "Bash(wget * | *)",
       "Bash(pip install *)",
+      "Bash(pip3 install *)",
+      "Bash(python -m pip *)",
+      "Bash(python3 -m pip *)",
       "Bash(git push --force *)",
+      "Bash(git push -f *)",
       "Bash(git push origin main)",
       "Bash(git push origin master)",
+      "Bash(git push origin HEAD:main)",
+      "Bash(git push origin HEAD:master)",
       "Bash(git remote add *)",
       "Bash(git remote set-url *)",
       "Bash(git config *)"
@@ -63,7 +71,10 @@ CLAUDE.md is advisory. The sandbox provides actual OS-level enforcement. Deploy 
 }
 ```
 
-**Note:** Claude can push to feature branches (needed to open PRs) but cannot push to `main` or force-push. Branch protection is the backstop. No network restrictions — analysts already have internet access on their machines.
+`allowManagedPermissionRulesOnly` — local/project settings cannot override these denies.
+`disableBypassPermissionsMode` — prevents the user from entering unrestricted mode.
+
+**Note:** Claude can push to feature branches (needed to open PRs) but cannot push to `main` or force-push. Branch protection is the backstop.
 
 - [ ] Deploy managed settings file to analyst machine(s)
 - [ ] Verify managed settings cannot be overridden by the analyst
@@ -87,6 +98,14 @@ CLAUDE.md is advisory. The sandbox provides actual OS-level enforcement. Deploy 
 - [ ] Merge and confirm scheduled workflow runs (or trigger manually)
 
 ## Secrets (only if scheduled output delivery is needed)
-- [ ] Add scoped secrets (e.g., `SHAREPOINT_TOKEN`) via Settings → Secrets → Actions
+
+**WARNING:** Any code merged to `main` can access secrets in scheduled CI runs. This is a real exfiltration risk. Mitigate with protected environments.
+
+- [ ] Create a **protected environment** (Settings → Environments → New → "production")
+  - Require at least 1 reviewer before deployment
+  - Limit which branches can deploy (only `main`)
+- [ ] Add scoped secrets to the **environment**, not to the repo
+- [ ] Uncomment `environment: production` in `scheduled-run.yml`
 - [ ] Document what each secret is for and its scope
 - [ ] Set expiration reminders
+- [ ] Enable GitHub secret scanning (Settings → Code security → Secret scanning)

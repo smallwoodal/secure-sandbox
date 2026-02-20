@@ -27,8 +27,10 @@ Then describe what you need in plain English. Claude Code will write the code, a
 ```
 src/            Application code
 tests/          Test suite
-schemas/        Validation schemas
 data/inbox/     Drop input files here (gitignored)
 output/         Generated outputs (gitignored)
-ops/            Tutorial, IT checklist, runbooks
+ops/            Tutorial, IT checklist
+CLAUDE.md       Behavioral rules (loaded automatically)
+.claude/        Sandbox and permission settings
+CODEOWNERS      Requires IT review for security-sensitive files
 ```
