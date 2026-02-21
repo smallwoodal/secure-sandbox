@@ -144,6 +144,9 @@ CLAUDE.md is advisory. The sandbox provides actual OS-level enforcement. Deploy 
 - The deny list is partial, not comprehensive. It blocks common dangerous patterns but cannot anticipate every variant.
 - Sandbox reads are unrestricted by default — Bash can read files outside the working directory. Writes are restricted. The network allowlist prevents exfiltration of read data.
 - Claude's web browsing (WebFetch/WebSearch) is unrestricted — the sandbox network allowlist only affects Bash commands. Autonomous tool-driven exfiltration is a different risk class than human browsing (faster, less visible, prompt-injection triggerable). The Bash sandbox blocks shell-level exfil. For maximum lockdown, move WebFetch/WebSearch from the allow list to the deny list.
+- `github.com` in `allowedDomains` is a broad domain — Anthropic's docs warn that broad domains like `github.com` may allow data exfiltration via Bash. We include it because PR workflows require it. Remove it if your threat model is concerned about Bash-level exfil via GitHub API (analysts would push manually).
+- Domain fronting can bypass network sandbox filtering — Anthropic's docs note this as a known limitation. The network allowlist is a strong control but not airtight. PR review remains the backstop.
+- `autoAllowBashIfSandboxed` defaults to `true` — when the sandbox is enabled, Bash commands matching the allow list are auto-approved without prompts. Under `dontAsk` mode this is the intended behavior (unapproved commands are auto-denied). Set `autoAllowBashIfSandboxed: false` in managed settings if you want explicit prompts for every Bash command.
 
 ## 6. Analyst machine setup
 - [ ] Install Claude Code: `npm install -g @anthropic-ai/claude-code`
